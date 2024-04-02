@@ -1,4 +1,3 @@
-from scannr.stochastic_ann.stochastic_ffd import StochasticFFDANN
 import unittest
 import time
 import os
@@ -9,6 +8,7 @@ import tensorflow as tf
 tf.config.experimental.enable_op_determinism()
 os.environ['KERAS_BACKEND'] = 'tensorflow'
 import keras
+from scannr.stochastic_ann.stochastic_ffd import StochasticFFDANN
 
 
 SEED = 0
@@ -39,38 +39,41 @@ class TestDataGenerator:
 
         return x, y
 
-    def _split_data(self, x:np.array, y:np.array) -> tuple:
+    def _split_data(self, x:np.array, y:np.array) -> dict:
         train_features = x[0:self.cv_split_index, :]
         train_targets = y[0:self.cv_split_index, :]
         test_features = x[self.cv_split_index:, ]
         test_targets = y[self.cv_split_index:, ]
 
-        return train_features, train_targets, test_features, \
-            test_targets
+        return {
+            'training_features': train_features, 
+            'training_targets': train_targets, 
+            'testing_features': test_features,
+            'testing_targets': test_targets
+        }
 
     @staticmethod
-    def _generate_data(features:np.array,
-                       targets:np.array,
-                       batch_size:int) -> tf.data.Dataset:
+    def _generate_dataset(features:np.array,
+                          targets:np.array,
+                          batch_size:int) -> tf.data.Dataset:
         # Prepare the training dataset.
-        dataset = tf.data.Dataset.from_tensor_slices(
+        return tf.data.Dataset.from_tensor_slices(
             (features, targets)
         ).batch(batch_size=batch_size)
 
-        return dataset
 
     def generate_data(self):
         x, y = self._generate_raw_data()
-        training_features, training_targets, testing_features, \
-            testing_targets = self._split_data(x=x, y=y)
-        training_dataset = self._generate_data(
-            features=training_features,
-            targets=training_targets,
-            batch_size=2
+        data_package = self._split_data(x=x, y=y)
+        self.data_package = data_package
+        training_dataset = self._generate_dataset(
+            features=data_package['training_features'],
+            targets=data_package['training_targets'],
+            batch_size=TRAINING_BATCH_SIZE
         )
-        validation_dataset = self._generate_data(
-            features=testing_features,
-            targets=testing_targets,
+        validation_dataset = self._generate_dataset(
+            features=data_package['testing_features'],
+            targets=data_package['testing_features'],
             batch_size=self.case_count-self.cv_split_index
         )
 
@@ -88,11 +91,12 @@ class TestStochasticFFDANN(unittest.TestCase):
             proportion=PROPORTION
         )
         self.testing_data = test_data_generator.generate_data()
+        self.data_package = test_data_generator.data_package
 
     def test_stochastic_ffdann(self):
 
         stochastic_ffd_ann = StochasticFFDANN(feature_total=10, k=30)
-        mean, variance = stochastic_ffd_ann.predict(self.testing_data[0])
+        mean, variance = stochastic_ffd_ann.predict(self.data_package['training_features'])
 
     def tearDown(self) -> None:
         self.testing_data = None
