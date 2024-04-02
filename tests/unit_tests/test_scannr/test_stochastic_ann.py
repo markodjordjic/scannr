@@ -25,10 +25,14 @@ class DataGenerator:
         self.case_count = case_count
         self.feature_count = feature_count
         self.proportion = proportion
-        self.cv_split_index = floor(self.case_count*self.proportion)
-        self.data_package = None
+        self.raw_data = None
+        self.cv_split_index = None
+        self.training_data = None
+        self.validation_data = None
+        self.training_dataset = None
+        self.validation_dataset = None
 
-    def _generate_raw_data(self) -> tuple:
+    def _generate_raw_data(self):
         """Generated data includes both features and targets, returned
         within the `tuple` object
 
@@ -38,21 +42,15 @@ class DataGenerator:
         ))
         y = np.random.gamma(shape=2, size=(self.case_count, 1))
 
-        return x, y
+        self.raw_data = np.hstack((x, y))
 
-    def _split_data(self, x:np.array, y:np.array) -> None:
-        train_features = x[0:self.cv_split_index, :]
-        train_targets = y[0:self.cv_split_index, :]
-        test_features = x[self.cv_split_index:, ]
-        test_targets = y[self.cv_split_index:, ]
+    def _compute_split_index(self):
+        self.cv_split_index = floor(self.case_count*self.proportion)
 
-        self.data_package = {
-            'training_features': train_features, 
-            'training_targets': train_targets, 
-            'testing_features': test_features,
-            'testing_targets': test_targets
-        }
-
+    def _split_data(self) -> None:
+        self.training_data = self.raw_data[0:self.cv_split_index, :]
+        self.validation_data =  self.raw_data[self.cv_split_index:, ]
+        
     @staticmethod
     def _generate_dataset(features:np.array,
                           targets:np.array,
@@ -62,22 +60,36 @@ class DataGenerator:
             (features, targets)
         ).batch(batch_size=batch_size)
 
+    @staticmethod
+    def get_features(array: np.array):
 
-    def generate_data(self):
-        x, y = self._generate_raw_data()
-        self._split_data(x=x, y=y)
-        training_dataset = self._generate_dataset(
-            features=self.data_package['training_features'],
-            targets=self.data_package['training_targets'],
+        return array[:, 0:-1]
+
+    @staticmethod
+    def get_targets(array: np.array):
+
+        return array[:, -1].reshape(-1, 1)
+
+    def _generate_datasets(self):
+        self.training_dataset = self._generate_dataset(
+            features=self.get_features(self.training_data),
+            targets=self.get_targets(self.training_data),
             batch_size=TRAINING_BATCH_SIZE
         )
-        validation_dataset = self._generate_dataset(
-            features=self.data_package['testing_features'],
-            targets=self.data_package['testing_features'],
+        self.validation_dataset = self._generate_dataset(
+            features=self.get_features(self.validation_data),
+            targets=self.get_targets(self.validation_data),
             batch_size=self.case_count-self.cv_split_index
         )
 
-        return training_dataset, validation_dataset
+    def generate_data(self):
+        """Wrapper around private methods
+
+        """
+        self._generate_raw_data()
+        self._compute_split_index()
+        self._split_data()
+        self._generate_datasets()
 
 class TestStochasticFFDANN(unittest.TestCase):
 
@@ -87,13 +99,12 @@ class TestStochasticFFDANN(unittest.TestCase):
         FEATURE_COUNT = 5
         PROPORTION = .8
         
-        test_data_generator = DataGenerator(
+        self.test_data_generator = DataGenerator(
             case_count=CASE_COUNT,
             feature_count=FEATURE_COUNT,
             proportion=PROPORTION
         )
-        self.testing_data = test_data_generator.generate_data()
-        self.data_package = test_data_generator.data_package
+        self.test_data_generator.generate_data()
 
     def test_stochastic_ffdann(self):
 
@@ -110,7 +121,11 @@ class TestStochasticFFDANN(unittest.TestCase):
 
         stochastic_ffd_ann = StochasticFFDANN(feature_total=10, k=30)
         mean, _ = \
-            stochastic_ffd_ann.predict(self.data_package['training_features'])
+            stochastic_ffd_ann.predict(
+                self.test_data_generator.get_features(
+                    self.test_data_generator.training_data
+                )
+            )
 
         np.testing.assert_almost_equal(
             desired=desired,
@@ -119,7 +134,7 @@ class TestStochasticFFDANN(unittest.TestCase):
         )
 
     def tearDown(self) -> None:
-        self.testing_data = None
+        self.test_data_generator = None
 
 
 def test_suite():
