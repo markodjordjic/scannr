@@ -19,7 +19,7 @@ TRAINING_BATCH_SIZE = 2
 keras.utils.set_random_seed(seed=SEED)
 
 
-class TestDataGenerator:
+class DataGenerator:
 
     def __init__(self, case_count, feature_count, proportion) -> None:
         self.case_count = case_count
@@ -82,10 +82,12 @@ class TestDataGenerator:
 class TestStochasticFFDANN(unittest.TestCase):
 
     def setUp(self) -> None:
+        
         CASE_COUNT = 10
         FEATURE_COUNT = 5
         PROPORTION = .8
-        test_data_generator = TestDataGenerator(
+        
+        test_data_generator = DataGenerator(
             case_count=CASE_COUNT,
             feature_count=FEATURE_COUNT,
             proportion=PROPORTION
@@ -121,6 +123,7 @@ class TestStochasticFFDANN(unittest.TestCase):
 
 
 def test_suite():
+    
     suite = unittest.TestSuite()
     suite.addTest(TestStochasticFFDANN('test_stochastic_ffdann'))
 
