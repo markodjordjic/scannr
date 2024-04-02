@@ -11,13 +11,23 @@ os.environ['KERAS_BACKEND'] = 'tensorflow'
 import keras
 
 
+SEED = 0
+LEARNING_RATE = 1e-3
+EPOCHS = 10
+TRAINING_BATCH_SIZE = 2
+
+keras.utils.set_random_seed(seed=SEED)
+
+
 class TestDataGenerator:
 
     def __init__(self, case_count, feature_count, proportion) -> None:
         self.case_count = case_count
         self.feature_count = feature_count
+        self.proportion = proportion
+        self.cv_split_index = floor(self.case_count*self.proportion)
 
-    def _generate_raw_data(self, ) -> tuple:
+    def _generate_raw_data(self) -> tuple:
         """Generated data includes both features and targets, returned
         within the `tuple` object.
 
@@ -28,11 +38,8 @@ class TestDataGenerator:
         y = np.random.gamma(shape=2, size=(self.case_count, 1))
 
         return x, y
-    
-    def _compute_split_index(self):
-        self.cv_split_index = floor(self.case_total*self.proportion)
 
-    def _split_data(self,x:np.array, y:np.array) -> tuple:
+    def _split_data(self, x:np.array, y:np.array) -> tuple:
         train_features = x[0:self.cv_split_index, :]
         train_targets = y[0:self.cv_split_index, :]
         test_features = x[self.cv_split_index:, ]
@@ -41,37 +48,54 @@ class TestDataGenerator:
         return train_features, train_targets, test_features, \
             test_targets
 
-
-    def generate_data(self,
-                      train_features:np.array,
-                      train_targets:np.array,
-                      training_batch_size:int,
-                      test_features:np.array,
-                      test_targets:np.array,
-                      validation_batch_size:int) -> tf.data.Dataset:
+    @staticmethod
+    def _generate_data(features:np.array,
+                       targets:np.array,
+                       batch_size:int) -> tf.data.Dataset:
         # Prepare the training dataset.
-        train_dataset = tf.data.Dataset.from_tensor_slices(
-            (train_features, train_targets)
-        ).batch(batch_size=training_batch_size)
+        dataset = tf.data.Dataset.from_tensor_slices(
+            (features, targets)
+        ).batch(batch_size=batch_size)
 
-        # Prepare the validation dataset.
-        val_dataset = tf.data.Dataset.from_tensor_slices(
-            (test_features, test_targets)
-        ).batch(batch_size=validation_batch_size)
+        return dataset
 
-        return train_dataset, val_dataset
+    def generate_data(self):
+        x, y = self._generate_raw_data()
+        training_features, training_targets, testing_features, \
+            testing_targets = self._split_data(x=x, y=y)
+        training_dataset = self._generate_data(
+            features=training_features,
+            targets=training_targets,
+            batch_size=2
+        )
+        validation_dataset = self._generate_data(
+            features=testing_features,
+            targets=testing_targets,
+            batch_size=self.case_count-self.cv_split_index
+        )
 
+        return training_dataset, validation_dataset
 
 class TestStochasticFFDANN(unittest.TestCase):
-    
+
     def setUp(self) -> None:
-        test_data_generator = TestDataGenerator()
+        CASE_COUNT = 10
+        FEATURE_COUNT = 5
+        PROPORTION = .8
+        test_data_generator = TestDataGenerator(
+            case_count=CASE_COUNT,
+            feature_count=FEATURE_COUNT,
+            proportion=PROPORTION
+        )
         self.testing_data = test_data_generator.generate_data()
 
     def test_stochastic_ffdann(self):
 
         stochastic_ffd_ann = StochasticFFDANN(feature_total=10, k=30)
-        mean, variance = stochastic_ffd_ann.predict(training_features)
+        mean, variance = stochastic_ffd_ann.predict(self.testing_data[0])
+
+    def tearDown(self) -> None:
+        self.testing_data = None
 
 
 def test_suite():
