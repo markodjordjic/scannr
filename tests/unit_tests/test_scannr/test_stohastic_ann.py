@@ -4,6 +4,7 @@ import numpy as np
 import keras
 import tensorflow as tf
 from math import floor
+import matplotlib.pyplot as plt
 
 
 def generate_raw_data(case_count, feature_count) -> tuple:
@@ -64,6 +65,7 @@ class TestStochasticFFDANN(unittest.TestCase):
         EPOCHS = 10
         TRAINING_BATCH_SIZE = 2
 
+
         keras.utils.set_random_seed(seed=SEED)
 
         # Generate features and targets.  
@@ -91,9 +93,8 @@ class TestStochasticFFDANN(unittest.TestCase):
         )
 
         stochastic_ffd_ann = StohasticFFDANN(feature_total=10, k=30)
-        stochastic_ffd_ann(training_features)
+        mean, variance = stochastic_ffd_ann.predict(training_features)
 
-        print('Hello Wild')
 
 def test_suite():
     suite = unittest.TestSuite()
