@@ -15,13 +15,13 @@ class StochasticRegressionBlock(keras.layers.Layer):
         )
         self.dropout = keras.layers.AlphaDropout(rate=.5)
 
-    def call(self, input_tensor, training):
-        x = self.regression(input_tensor)
-        x = self.dropout(x, training=training)
+    def call(self, inputs):
+        x = self.regression(inputs)
+        x = self.dropout(x)
 
         return x
 
-class StohasticFFDANN(keras.Model):
+class StochasticFFDANN(keras.Model):
 
     def __init__(self, feature_total, k):
         super().__init__()
@@ -35,14 +35,18 @@ class StohasticFFDANN(keras.Model):
         self.outputs = keras.layers.Dense(units=1, activation=None)
 
     def call(self, inputs, training=False):
-        x = self.regression_1(training=training)(inputs)
-        x = self.regression_2(x, training=training)
+        x = self.regression_1(inputs)
+        x = self.regression_2(x)
         x = self.outputs(x)
 
-        # # Custom prediction.
-        # predictions = [
-        #     [self.outputs(x)] for _ in range(0, self.k)
-        # ]
+        return x
 
-        # return \
-        #     tf.reduce_mean(tf.convert_to_tensor(predictions), axis=0)
+    def predict(self, inputs):
+
+        predictions = tf.convert_to_tensor([
+            [self.call(inputs)] for _ in range(0, self.k)
+        ])
+
+        return \
+            tf.math.reduce_mean(predictions, axis=0), \
+            tf.math.reduce_std(predictions, axis=0)
