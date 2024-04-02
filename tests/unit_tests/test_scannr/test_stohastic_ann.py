@@ -1,10 +1,15 @@
-from scannr.stohastic_ann.stohastic_ffd import StohasticFFDANN
+from scannr.stochastic_ann.stochastic_ffd import StochasticFFDANN
 import unittest
-import numpy as np
-import keras
-import tensorflow as tf
+import time
+import os
 from math import floor
-import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+tf.config.experimental.enable_op_determinism()
+os.environ['KERAS_BACKEND'] = 'tensorflow'
+import keras
+
 
 
 def generate_raw_data(case_count, feature_count) -> tuple:
@@ -92,7 +97,7 @@ class TestStochasticFFDANN(unittest.TestCase):
             validation_batch_size=CASE_COUNT-floor(CASE_COUNT*PROPORTION)
         )
 
-        stochastic_ffd_ann = StohasticFFDANN(feature_total=10, k=30)
+        stochastic_ffd_ann = StochasticFFDANN(feature_total=10, k=30)
         mean, variance = stochastic_ffd_ann.predict(training_features)
 
 
